@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      grep_filter:
+        description: 'Test filter (regex for --grep)'
+        required: false
+        default: ''
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run tests
+        run: |
+          FILTER="${{ inputs.grep_filter }}"
+          if [ -n "$FILTER" ]; then
+            npm test -- --grep "$FILTER"
+          else
+            npm test
+          fi
+      - name: Sync status to UnitTCMS
+        if: always()
+        env:
+          UNITTCMS_URL: ${{ secrets.UNITTCMS_URL }}
+          UNITTCMS_TOKEN: ${{ secrets.UNITTCMS_TOKEN }}
+          UNITTCMS_PROJECT_ID: ${{ secrets.UNITTCMS_PROJECT_ID }}
+        run: npm run sync
